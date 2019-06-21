@@ -14,7 +14,10 @@
 
 #define false 0
 #define true 1
+#define start_of_PIDs 400
 #define BUFFER_SIZE 2048
+#define TMP_SIZE 200
+
 #define IS_ALL(ip) (ip->inum < block.ninodes ? true : false)
 #define IS_IDEINFO(ip) (ip->inum == block.ninodes + 1 ? true : false)
 #define IS_FILESTAT(ip) (ip->inum == block.ninodes + 2 ? true : false)
@@ -129,6 +132,15 @@ add_all(char *buff, int inum, int *offset){
 	add_one(buff, inum + 1, "ideinfo", offset);
 	add_one(buff, inum + 2, "filestat", offset);
 	add_one(buff, inum + 3, "ideinfo", offset);
+	int pids[NPROC];
+	memset(pids, 0, NPROC);
+	set_pids_for_fs(pids);
+	int i;
+	for (i = 0; i < NPROC; ++i)
+	{
+		char tmp[]
+	}
+
 }
 
 void

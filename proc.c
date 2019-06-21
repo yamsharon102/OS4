@@ -21,6 +21,20 @@ extern void trapret(void);
 static void wakeup1(void *chan);
 
 void
+set_pids_for_fs(int *pids){
+
+  struct proc *p;
+  int i = 0;
+  
+  acquire(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++, i++)
+    pids[i] = p->pid;
+
+  release(&ptable.lock);
+}
+
+void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
