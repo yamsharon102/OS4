@@ -24,6 +24,7 @@
 #define IS_IDEINFO(ip) (ip->inum == block.ninodes + 1 ? true : false)
 #define IS_FILESTAT(ip) (ip->inum == block.ninodes + 2 ? true : false)
 #define IS_INODEINFO(ip) (ip->inum == block.ninodes + 3 ? true : false)
+#define IS_INODE_NODE(ip) (ip->inum >= block.ninodes + START_OF_INODES && ip->inum < block.ninodes + start_of_PIDs ? true : false)
 #define IS_PIDDir(ip) (((ip->inum - start_of_PIDs - block.ninodes) % 3) == 0 ? true : false)
 #define IS_IN_PIDs(ip) ((ip->inum >= block.ninodes + start_of_PIDs) ? true : false)
 
@@ -217,19 +218,25 @@ inodeinfo_handler(char* buff, int inum){
 		add_one(buff, inum + START_OF_INODES + i, name, index++);
 	}
 	return (index * sizeof(struct dirent));
+}
 
-	/* struct inode *ip = get_inode(inum);
+int
+inode_handler(char *buff, int inum){
+
+	struct inode *ip = get_inode(inum);
   	if(!ip)
-  		return;
+  		return 0;
 
-	sprintf(get_buff(buff), "%s:%d\n%s:%d\n%s:%d\n%s:%d\n%s:(%d,%d)\n",
+	sprintf(get_buff(buff), "%s:%d\n%s:%d\n%s:%d\n%s:%s\n%s:(%d,%d)\n%s:%d\n%s:%d\n",
 		"Device", ip->dev,
 		"Inode number",ip->inum,
 		"is valid",ip->valid,
 		"type",ip->type == T_DEV ? "DEV" : ip->type == T_DIR ? "DIR" : "FILE",
 		"major minor",ip->major, ip->minor,
 		"hard links", ip->nlink, 
-		"blocks used", ip->type == T_DEV ? 0 : ip->size / 128);*/
+		"blocks used", ip->type == T_DEV ? 0 : ip->size / 128);
+
+	return strlen(buff);
 }
 
 int
@@ -288,32 +295,8 @@ int procfsread(struct inode *ip, char *dst, int off, int n)
 				 IS_IDEINFO(ip) ? ideinfo_handler(buff) :
 				 IS_FILESTAT(ip) ? filestat_handler(buff) :
 				 IS_INODEINFO(ip) ? inodeinfo_handler(buff, block.ninodes) :
+				 IS_INODE_NODE(ip) ? inode_handler(buff, ip->inum) :
 				 IS_IN_PIDs(ip) ? in_pids_handler(buff, ip) : 0;
-	/*  code of IDEINFO def
-		Need To Put In File -
-		Waiting operations: <Number of waiting operations starting from idequeue>
-		Read waiting operations: <Number of read operations>
-		Write waiting operations: <Number of write operations>
-		Working blocks: <List (#device,#block) that are currently in the queue separated by the ‘;’
-		symbol> */
-	/* code of FILESTAT def
-		Need To Put In File -
-			Free fds: <free fd number (ref = 0)>
-			Unique inode fds: <Number of different inodes open by all the fds>
-			Writeable fds: <Writable fd number>
-			Readable fds: <Readable fd number>
-			Refs per fds: <ratio of total number of refs / number of used fds>*/
-	/* code of INODEINFO def
-		Directory - Each File -
-		Name - index in the open inode table (in use)
-		Content - 
-		Device: <device the inode belongs to>
-		Inode number: <inode number in the device>
-		is valid: <0 for no, 1 for yes>
-		type: <DIR, FILE or DEV>
-		major minor: <(major number, minor number)>
-		hard links: <number of hardlinks>
-		blocks used: <number of blocks used in the file, 0 for DEV files>*/
 
 	memmove(dst, buff + off, n);
 	int diff = offset - off;
@@ -372,3 +355,30 @@ get_refs(struct file **files){
     }
     return ret / counter;
 }
+
+
+	/*  code of IDEINFO def
+		Need To Put In File -
+		Waiting operations: <Number of waiting operations starting from idequeue>
+		Read waiting operations: <Number of read operations>
+		Write waiting operations: <Number of write operations>
+		Working blocks: <List (#device,#block) that are currently in the queue separated by the ‘;’
+		symbol> */
+	/* code of FILESTAT def
+		Need To Put In File -
+			Free fds: <free fd number (ref = 0)>
+			Unique inode fds: <Number of different inodes open by all the fds>
+			Writeable fds: <Writable fd number>
+			Readable fds: <Readable fd number>
+			Refs per fds: <ratio of total number of refs / number of used fds>*/
+	/* code of INODEINFO def
+		Directory - Each File -
+		Name - index in the open inode table (in use)
+		Content - 
+		Device: <device the inode belongs to>
+		Inode number: <inode number in the device>
+		is valid: <0 for no, 1 for yes>
+		type: <DIR, FILE or DEV>
+		major minor: <(major number, minor number)>
+		hard links: <number of hardlinks>
+		blocks used: <number of blocks used in the file, 0 for DEV files>*/
