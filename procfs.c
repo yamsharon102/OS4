@@ -15,6 +15,8 @@
 #define false 0
 #define true 1
 #define BUFFER_SIZE 2048
+#define MAX_NUM_LEN 32
+
 #define IS_ALL(ip) (ip->inum < block.ninodes ? true : false)
 #define IS_IDEINFO(ip) (ip->inum == block.ninodes + 1 ? true : false)
 #define IS_FILESTAT(ip) (ip->inum == block.ninodes + 2 ? true : false)
@@ -138,6 +140,14 @@ add_all(char *buff, int inum){
 	add_one(buff, inum + 1, "ideinfo");
 	add_one(buff, inum + 2, "filestat");
 	add_one(buff, inum + 3, "ideinfo");
+	int pids[NPROC];
+	memset(pids, 0, NPROC);
+	int i;
+	for (i = 0; i < NPROC; ++i)
+	{
+		char tmp_num[MAX_NUM_LEN];
+
+	}
 }
 
 void
