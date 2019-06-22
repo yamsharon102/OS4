@@ -166,3 +166,52 @@ iderw(struct buf *b)
 
   release(&idelock);
 }
+
+int is_waiting(struct buf **c){
+  return 1;
+}
+
+int is_write(struct buf **c){
+  return ((*c)->flags & B_DIRTY) == B_DIRTY;
+}
+
+int is_read(struct buf **c){
+  return !((*c)->flags & B_VALID);
+}
+
+int
+count(int (*pred)(struct buf**)){
+  int ret = 0;
+  struct buf** curr;
+  acquire(&idelock);
+  for(curr = &idequeue; *curr; curr=&(*curr)->qnext)
+    if(pred(curr))
+      ret++;
+  release(&idelock);
+  return ret;
+}
+
+int
+get_waiting(){
+  return count(&is_waiting);
+}
+
+int get_read(){
+  return count(&is_read);
+}
+
+int get_write(){
+  return count(&is_write);
+}
+
+void get_working(wblock **blocks){
+  struct buf** curr;
+  int i = 0;
+  acquire(&idelock);
+  for(curr = &idequeue; *curr; curr=&(*curr)->qnext){
+    blocks[i]->device = (*curr)->dev;
+    blocks[i++]->block = (*curr)->blockno;
+  }
+  release(&idelock);
+  blocks[i] = 0;
+}

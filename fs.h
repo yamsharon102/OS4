@@ -55,3 +55,7 @@ struct dirent {
   char name[DIRSIZ];
 };
 
+typedef struct wblock {
+  int device;
+  int block;
+} wblock;

@@ -9,6 +9,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+typedef struct wblock wblock;
 
 // bio.c
 void            binit(void);
@@ -52,11 +53,16 @@ struct inode*   nameiparent(char*, char*);
 int             readi(struct inode*, char*, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
+struct inode* 	get_inode(int inum);
 
 // ide.c
 void            ideinit(void);
 void            ideintr(void);
 void            iderw(struct buf*);
+int 			get_waiting();
+int 			get_read();
+int 			get_write();
+void 			get_working(wblock **);
 
 // ioapic.c
 void            ioapicenable(int irq, int cpu);
@@ -120,6 +126,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void			get_proc_files(struct file**);
 
 // procfs.c
 void            procfsinit(void);

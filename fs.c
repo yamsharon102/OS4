@@ -677,3 +677,14 @@ nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
 }
+
+struct inode*
+get_inode(int inum){
+  struct inode* ip;
+  acquire(&icache.lock);
+  for(ip = icache.inode; ip < &icache.inode[NINODE]; ip++) 
+    if(ip->inum == inum)
+      break;
+  release(&icache.lock);
+  return ip;
+}

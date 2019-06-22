@@ -510,6 +510,14 @@ kill(int pid)
   return -1;
 }
 
+void
+get_proc_files(struct file** files){
+  struct proc *curproc = myproc();
+
+  for (int i = 0; i < NOFILE; i++)
+    files[i] = curproc->ofile[i];
+}
+
 //PAGEBREAK: 36
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
