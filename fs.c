@@ -696,3 +696,11 @@ get_inode(int inum){
   release(&icache.lock);
   return ip;
 }
+
+void
+get_inodes(int *indices){
+  acquire(&icache.lock);
+  for(int i = 0; i < NINODE; i++)
+      indices[i] = icache.inode[i].ref > 0;
+  release(&icache.lock);
+}
