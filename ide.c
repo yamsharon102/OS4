@@ -211,6 +211,7 @@ void get_working(wblock **blocks){
   for(curr = &idequeue; *curr; curr=&(*curr)->qnext){
     blocks[i]->device = (*curr)->dev;
     blocks[i++]->block = (*curr)->blockno;
+    // cprintf("%d %d\n", blocks[i - 1]->device, blocks[i - 1]->block);
   }
   release(&idelock);
   blocks[i] = 0;
