@@ -22,11 +22,11 @@
 #define IS_IDEINFO(ip) (ip->inum == block.ninodes + 1 ? true : false)
 #define IS_FILESTAT(ip) (ip->inum == block.ninodes + 2 ? true : false)
 #define IS_INODEINFO(ip) (ip->inum == block.ninodes + 3 ? true : false)
+#define IS_PIDDir(ip) (((ip->inum - start_of_PIDs - block.ninodes) % 3) == 0 ? true : false)
 
-int my_minor = 0;
-enum my_inum {PROC, IDEINFO, FILESTAT, INODEINFO}; 
 struct superblock block;
 int blockInit = 0;
+
 
 int get_free(struct file **files);
 int get_unique(struct file **files);
@@ -114,41 +114,52 @@ procfsisdir(struct inode *ip) {
   		readsb(ip->dev, &block);
   		blockInit = true;
 	}
-  	return !((ip->major == PROCFS) & (ip->type == T_DEV) & 
-  		(!IS_IDEINFO(ip)) & (!IS_FILESTAT(ip)));
+	return (((ip->type == T_DEV) && (ip->major == PROCFS)) 
+		&& (!IS_IDEINFO(ip)) && (!IS_FILESTAT(ip))) && (!IS_PIDDir(ip));
+	//Maybe should add pids
 }
+
 
 void 
 procfsiread(struct inode* dp, struct inode *ip) {
 	ip->major = PROCFS;
 	ip->type = T_DEV;
 	ip->valid = 1;
-	ip->minor = my_minor++; //???
 }
 
-void
-add_one(char *buff, int inum, const char *dir){
+void 
+add_one(char *buff, int inum, const char *name, int index)
+{
 	struct dirent dirent;
 	dirent.inum = inum;
-	memmove(&dirent.name, dir, strlen(dir) + 1);
-	sprintf(get_buff(buff), (char*) &dirent);
+	memmove(&dirent.name, name, strlen(name) + 1);
+	memmove(buff + (index * sizeof(dirent)), &dirent, sizeof(dirent));
 }
 
-void
-add_all(char *buff, int inum){
-	add_one(buff, namei("/proc")->inum, ".");
-	add_one(buff, namei("")->inum, "..");
-	add_one(buff, inum + 1, "ideinfo");
-	add_one(buff, inum + 2, "filestat");
-	add_one(buff, inum + 3, "ideinfo");
+int add_all(char *buff, int inum)
+{
+	int index = 0;
+	add_one(buff, namei("/proc")->inum, ".", index++);
+	add_one(buff, namei("")->inum, "..", index++);
+	add_one(buff, inum + 1, "ideinfo", index++);
+	add_one(buff, inum + 2, "filestat", index++);
+	add_one(buff, inum + 3, "ideinfo", index++);
 	int pids[NPROC];
-	memset(pids, 0, NPROC);
+	for (int i = 0; i < NPROC; i++)
+		pids[i] = 0;
+	set_pids_for_fs(pids);
 	int i;
-	for (i = 0; i < NPROC; ++i)
+	for (i = 0; i < NPROC; i++)
 	{
 		char tmp_num[MAX_NUM_LEN];
-
+		memset(tmp_num, 0, MAX_NUM_LEN);
+		if (pids[i])
+		{
+			sprinti(tmp_num, pids[i]);
+			add_one(buff, inum + start_of_PIDs + (3 * i), tmp_num, index++);
+		}
 	}
+	return (index * sizeof(struct dirent));
 }
 
 void
@@ -203,19 +214,22 @@ inodeinfo_handler(char* buff, int inum){
 		"blocks used", ip->type == T_DEV ? 0 : ip->size / 128);
 }
 
-int
-procfsread(struct inode *ip, char *dst, int off, int n) {
+
+
+
+int procfsread(struct inode *ip, char *dst, int off, int n)
+{
 	if (!blockInit){
   		readsb(ip->dev, &block);
   		blockInit = true;
 	}
 
+	int offset = 0;
 	char buff[BSIZE * 10];
 	memset(buff, 0, BSIZE * 10);
 
 	if (IS_ALL(ip))
-		add_all(buff, block.ninodes);
-
+		offset = add_all(buff, block.ninodes);
 	/*  code of IDEINFO def
 		Need To Put In File -
 		Waiting operations: <Number of waiting operations starting from idequeue>
@@ -250,25 +264,24 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
 	if (IS_INODEINFO(ip))
 		inodeinfo_handler(buff, ip->inum);
 
-	sprintf(dst, buff);
-
-    return strlen(buff);
+	memmove(dst, buff + off, n);
+	if (n < (offset - off) || (offset - off) <0)
+		return n;
+	return (offset - off);
 }
 
-int
-procfswrite(struct inode *ip, char *buf, int n)
+int procfswrite(struct inode *ip, char *buf, int n)
 {
   panic("System Can't Write, Only Read");
-  return 0;
+	return 0;
 }
 
-void
-procfsinit(void)
+void procfsinit(void)
 {
-  devsw[PROCFS].isdir = procfsisdir;
-  devsw[PROCFS].iread = procfsiread;
-  devsw[PROCFS].write = procfswrite;
-  devsw[PROCFS].read = procfsread;
+	devsw[PROCFS].isdir = procfsisdir;
+	devsw[PROCFS].iread = procfsiread;
+	devsw[PROCFS].write = procfswrite;
+	devsw[PROCFS].read = procfsread;
 }
 
 

@@ -520,6 +520,12 @@ namecmp(const char *s, const char *t)
   return strncmp(s, t, DIRSIZ);
 }
 
+int
+get_minor_by_name(char *name){
+  return namecmp(name, "name") ? NAME : 
+            namecmp(name, "status") ? STATUS : GEN;
+}
+
 // Look for a directory entry in a directory.
 // If found, set *poff to byte offset of entry.
 struct inode*
@@ -549,6 +555,8 @@ dirlookup(struct inode *dp, char *name, uint *poff)
       if (ip->valid == 0 && dp->type == T_DEV && devsw[dp->major].iread) {
         devsw[dp->major].iread(dp, ip);
       }
+      if (dp->major == PROCFS)
+        ip->minor = get_minor_by_name(de.name);
       return ip;
     }
   }
