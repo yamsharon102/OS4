@@ -522,8 +522,8 @@ namecmp(const char *s, const char *t)
 
 int
 get_minor_by_name(char *name){
-  return namecmp(name, "name") ? NAME : 
-            namecmp(name, "status") ? STATUS : GEN;
+  return !namecmp(name, "name") ? NAME : 
+            !namecmp(name, "status") ? STATUS : GEN;
 }
 
 // Look for a directory entry in a directory.

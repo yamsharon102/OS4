@@ -17,12 +17,14 @@
 #define start_of_PIDs 400
 #define BUFFER_SIZE 2048
 #define MAX_NUM_LEN 32
+#define MAX_NAME_LEN 100
 
 #define IS_ALL(ip) (ip->inum < block.ninodes ? true : false)
 #define IS_IDEINFO(ip) (ip->inum == block.ninodes + 1 ? true : false)
 #define IS_FILESTAT(ip) (ip->inum == block.ninodes + 2 ? true : false)
 #define IS_INODEINFO(ip) (ip->inum == block.ninodes + 3 ? true : false)
 #define IS_PIDDir(ip) (((ip->inum - start_of_PIDs - block.ninodes) % 3) == 0 ? true : false)
+#define IS_IN_PIDs(ip) ((ip->inum >= block.ninodes + start_of_PIDs) ? true : false)
 
 struct superblock block;
 int blockInit = 0;
@@ -115,8 +117,7 @@ procfsisdir(struct inode *ip) {
   		blockInit = true;
 	}
 	return (((ip->type == T_DEV) && (ip->major == PROCFS)) 
-		&& (!IS_IDEINFO(ip)) && (!IS_FILESTAT(ip))) && (!IS_PIDDir(ip));
-	//Maybe should add pids
+			&& (!IS_IDEINFO(ip)) && (!IS_FILESTAT(ip))) || (IS_PIDDir(ip));
 }
 
 
@@ -130,10 +131,10 @@ procfsiread(struct inode* dp, struct inode *ip) {
 void 
 add_one(char *buff, int inum, const char *name, int index)
 {
-	struct dirent dirent;
-	dirent.inum = inum;
-	memmove(&dirent.name, name, strlen(name) + 1);
-	memmove(buff + (index * sizeof(dirent)), &dirent, sizeof(dirent));
+	struct dirent tmp_dirent;
+	tmp_dirent.inum = inum;
+	memmove(&tmp_dirent.name, name, strlen(name) + 1);
+	memmove(buff + (index * sizeof(tmp_dirent)), &tmp_dirent, sizeof(tmp_dirent));
 }
 
 int add_all(char *buff, int inum)
@@ -143,10 +144,8 @@ int add_all(char *buff, int inum)
 	add_one(buff, namei("")->inum, "..", index++);
 	add_one(buff, inum + 1, "ideinfo", index++);
 	add_one(buff, inum + 2, "filestat", index++);
-	add_one(buff, inum + 3, "ideinfo", index++);
-	int pids[NPROC];
-	for (int i = 0; i < NPROC; i++)
-		pids[i] = 0;
+	add_one(buff, inum + 3, "inodeinfo", index++);
+	int pids[NPROC] = {0};
 	set_pids_for_fs(pids);
 	int i;
 	for (i = 0; i < NPROC; i++)
@@ -214,7 +213,40 @@ inodeinfo_handler(char* buff, int inum){
 		"blocks used", ip->type == T_DEV ? 0 : ip->size / 128);
 }
 
+int
+genPID_handler(char *buff, int inum){
+	int index = 0;
+	add_one(buff, inum, ".", index++);
+	add_one(buff, namei("/proc")->inum, "..", index++);
+	add_one(buff, inum+1, "name", index++);
+	add_one(buff, inum+2, "status", index++);
+	return (index * sizeof(struct dirent));
+}
 
+int
+namePID_handler(char *buff, int inum){
+
+	char proc_name[MAX_NAME_LEN];
+	memset(proc_name, 0, MAX_NAME_LEN);
+	set_proc_name(proc_name, inum-block.ninodes- start_of_PIDs);
+	sprintf(buff, "%s\n", proc_name);
+	return strlen(proc_name) + 1;
+}
+
+int
+statusPID_handler(char *buff, int inum){
+	
+	int curr_id = inum-block.ninodes- start_of_PIDs;
+	char proc_status[MAX_NAME_LEN];
+	memset(proc_status, 0, MAX_NAME_LEN);
+	char proc_sz[MAX_NUM_LEN];
+	memset(proc_sz, 0, MAX_NUM_LEN);
+	set_proc_status(proc_status, curr_id);
+	int sz = set_proc_sz(curr_id);
+	sprinti(proc_sz, sz);
+	sprintf(buff, "%s %s\n", proc_status, proc_sz);
+	return sizeof(proc_status) + sizeof(proc_sz) + 1;
+}
 
 
 int procfsread(struct inode *ip, char *dst, int off, int n)
@@ -228,6 +260,8 @@ int procfsread(struct inode *ip, char *dst, int off, int n)
 	char buff[BSIZE * 10];
 	memset(buff, 0, BSIZE * 10);
 
+	// cprintf("minor - %d\n", ip->minor);
+
 	if (IS_ALL(ip))
 		offset = add_all(buff, block.ninodes);
 	/*  code of IDEINFO def
@@ -237,7 +271,7 @@ int procfsread(struct inode *ip, char *dst, int off, int n)
 		Write waiting operations: <Number of write operations>
 		Working blocks: <List (#device,#block) that are currently in the queue separated by the ‘;’
 		symbol> */
-	if (IS_IDEINFO(ip))
+	else if (IS_IDEINFO(ip))
 		ideinfo_handler(buff);
 
 	/* code of FILESTAT def
@@ -247,7 +281,7 @@ int procfsread(struct inode *ip, char *dst, int off, int n)
 			Writeable fds: <Writable fd number>
 			Readable fds: <Readable fd number>
 			Refs per fds: <ratio of total number of refs / number of used fds>*/
-	if (IS_FILESTAT(ip))
+	else if (IS_FILESTAT(ip))
 		filestat_handler(buff);
 
 	/* code of INODEINFO def
@@ -261,8 +295,24 @@ int procfsread(struct inode *ip, char *dst, int off, int n)
 		major minor: <(major number, minor number)>
 		hard links: <number of hardlinks>
 		blocks used: <number of blocks used in the file, 0 for DEV files>*/
-	if (IS_INODEINFO(ip))
+	else if (IS_INODEINFO(ip))
 		inodeinfo_handler(buff, ip->inum);
+
+	else if (IS_IN_PIDs(ip))
+	{
+		if (ip->minor == GEN)
+		{
+			offset = genPID_handler(buff + offset, ip->inum);
+		}
+		else if (ip->minor == NAME)
+		{
+			offset = namePID_handler(buff, ip->inum);
+		}
+		else if (ip->minor == STATUS)
+		{
+			offset = statusPID_handler(buff, ip->inum);
+		}
+	}
 
 	memmove(dst, buff + off, n);
 	if (n < (offset - off) || (offset - off) <0)

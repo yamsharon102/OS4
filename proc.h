@@ -52,6 +52,9 @@ struct proc {
 };
 
 int set_pids_for_fs(int *pids);
+void set_proc_name(char *dst, int curr_id);
+void set_proc_status(char *dst, int curr_id);
+int set_proc_sz(int curr_id);
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

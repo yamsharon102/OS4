@@ -39,6 +39,77 @@ set_pids_for_fs(int *pids){
 }
 
 void
+set_proc_name(char *dst, int curr_id){
+
+  struct proc *p;
+  
+  acquire(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->pid == curr_id)
+      memmove(dst, p->name, strlen(p->name) + 1);
+    
+    
+  release(&ptable.lock);
+
+}
+
+char *
+get_proc_status(int state){
+  switch(state){
+    case UNUSED:
+      return "UNUSED";
+    case EMBRYO:
+      return "EMBRYO";
+    case SLEEPING:
+      return "SLEEPING";
+    case RUNNABLE:
+      return "RUNNABLE";
+    case RUNNING:
+      return "RUNNING";
+    case ZOMBIE:
+      return "ZOMBIE";
+    default:
+      return "";
+  }
+}
+
+void
+set_proc_status(char *dst, int curr_id){
+
+  struct proc *p;
+  
+  acquire(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->pid == curr_id){
+      memmove(dst, get_proc_status(p->state), strlen(get_proc_status(p->state)) + 1);
+    }
+    
+    
+  release(&ptable.lock);
+
+}
+
+int
+set_proc_sz(int curr_id){
+
+  struct proc *p;
+  int ret_val = 0;
+  
+  acquire(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->pid == curr_id)
+      ret_val = p->sz;
+    
+    
+  release(&ptable.lock);
+  return ret_val;
+
+}
+
+void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
